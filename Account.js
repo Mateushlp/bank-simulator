@@ -1,8 +1,8 @@
-const Deposit = require("./Deposit");
-const Loan = require("./Loan");
-const Transfer = require("./Transfer");
+import Deposit from "./Deposit.js";
+import Loan from "./Loan.js";
+import Transfer from "./Transfer.js";
 
-module.exports = class Account {
+export default class Account {
   #balance;
 
   constructor(balance, owner) {
@@ -24,16 +24,33 @@ module.exports = class Account {
          this.#balance +=valor
     }
 
-    loan(valor, numeroDeParcelas) {
+    Loan(valor, numeroDeParcelas) {
+        if (valor <= 0) {
+             throw new Error("O valor do empréstimo deve ser maior que zero");
+        }
+         if (numeroDeParcelas <= 0) {
+           throw new Error("O número de parcelas deve ser maior que zero");
+         }
+
         const novoemprestimo = new Loan(valor, numeroDeParcelas)
         this.loans.push(novoemprestimo)
         this.#balance += novoemprestimo.valor
     }
     
     transfer(usuario, valor) {
-        this.#balance -= valor
-        usuario.account.deposit(valor)
-        const novaTransferencia = new Transfer(this.owner, usuario, valor)
-        this.transfers.push(novaTransferencia)
+
+         if (valor <= 0) {
+           throw new Error("O valor da transferência deve ser maior que zero");
+         }
+        if (valor > this.#balance) {
+            throw new Error("Saldo insuficiente para realizar a transferência");
+        } else {
+       
+        
+            this.#balance -= valor
+            usuario.account.deposit(valor)
+            const novaTransferencia = new Transfer(this.owner, usuario, valor)
+            this.transfers.push(novaTransferencia)
+        }
     }
 };

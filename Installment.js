@@ -1,4 +1,4 @@
-module.exports = class Installment{
+export default class Installment{
 
     constructor(valor, numero) {
         this.valor = valor

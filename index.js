@@ -1,6 +1,6 @@
 
-const App = require("./App");
-const Loan = require("./Loan");
+import App from "./App.js";
+import Loan from "./Loan.js";
 
 App.createUser("Mateus", "mateus@email.com");
 App.createUser("João", "joao@email.com");

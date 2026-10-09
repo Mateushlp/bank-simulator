@@ -1,12 +1,9 @@
-const Account = require("./Account")
+import Account from "./Account.js";
 
-module.exports = class User{
-    constructor(nome, email) {
-        this.nome = nome
-        this.email = email
-        this.account = new Account(0, this)
-            
-        
-    }
-    
+export default class User {
+  constructor(nome, email) {
+    this.nome = nome;
+    this.email = email;
+    this.account = new Account(0, this);
+  }
 }

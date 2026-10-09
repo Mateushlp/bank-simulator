@@ -1,44 +1,146 @@
-const Deposit = require("./Deposit");
-const Loan = require("./Loan");
-const User = require("./User");
 
-module.exports = class App {
-  static #users = [];
+import prisma from "./prisma.js";
+import { transferService } from "./services/transferService.js";
 
-  static createUser(nome, email) {
-    const usuarioExistente = App.findUser(email);
-    if (usuarioExistente) {
-      console.log(
-        "Este usuario ja se encontra cadastrado no nosso sistema deseja fazer login?",
-      );
-    } else {
-      const usuario = new User(nome, email);
-      App.#users.push(usuario);
-    }
+export default class App {
+  static async getUsers() {
+    const usuarios = await prisma.user.findMany({
+      include: {
+        account: true,
+      },
+    });
+
+    return usuarios;
   }
-  static findUser(email) {
-    const usuario = App.#users.find((user) => user.email === email);
+
+  static async createUser(nome, email) {
+    if (!nome || !email) {
+      throw new Error("Nome e e-mail são obrigatórios!");
+    }
+
+    const usuarioExistente = await prisma.user.findUnique({
+      where: { email: email },
+    });
+
+    if (usuarioExistente) {
+      throw new Error("Este e-mail já está cadastrado!");
+    }
+
+    const usuario = await prisma.user.create({
+      data: {
+        nome: nome,
+        email: email,
+        account: {
+          create: {
+            balance: 0,
+          },
+        },
+      },
+    });
+
     return usuario;
   }
 
-  static deposit(email, valor) {
-    const usuario = App.findUser(email);
-    usuario.account.deposit(valor);
-  }
- 
-  static transfer(emailOrigem, emailDestino, valor) {
-    const usuarioOrigem = App.findUser(emailOrigem);
-    const usuarioDestino = App.findUser(emailDestino);
+  static async deposit(email, valor) {
+    if (
+      typeof valor !== "number" ||
+      !Number.isFinite(valor) ||
+      valor <= 0
+    ) {
+      throw new Error("O valor do depósito deve ser maior que zero!");
+    }
 
-    usuarioOrigem.account.transfer(usuarioDestino, valor);
+    const usuario = await prisma.user.findUnique({
+      where: { email: email },
+      include: { account: true },
+    });
+
+    if (!usuario) {
+      throw new Error("Usuário não encontrado no banco de dados!");
+    }
+
+    if (!usuario.account) {
+      throw new Error("Conta do usuário não encontrada!");
+    }
+
+    await prisma.account.update({
+      where: {
+        id: usuario.account.id,
+      },
+      data: {
+        balance: {
+          increment: valor,
+        },
+      },
+    });
   }
 
-  static loan(email, valor, numeroDeParcelas) {
-    const usuario = App.findUser(email);
-    usuario.account.loan(valor, numeroDeParcelas);
+  static async transfer(emailOrigem, emailDestino, valor) {
+    return transferService(emailOrigem, emailDestino, valor);
   }
 
-    static changeLoanInterestRate(valor) {
-      Loan.interestRate = valor
+  static async loan(email, valor, numeroDeParcelas) {
+    if (
+      typeof valor !== "number" ||
+      !Number.isFinite(valor) ||
+      valor <= 0
+    ) {
+      throw new Error("O valor do empréstimo deve ser maior que zero!");
+    }
+
+    if (
+      !Number.isInteger(numeroDeParcelas) ||
+      numeroDeParcelas <= 0
+    ) {
+      throw new Error(
+        "O número de parcelas deve ser um inteiro maior que zero!",
+      );
+    }
+
+    const usuario = await prisma.user.findUnique({
+      where: { email: email },
+      include: { account: true },
+    });
+
+    if (!usuario) {
+      throw new Error("Usuário não encontrado!");
+    }
+
+    if (!usuario.account) {
+      throw new Error("Conta do usuário não encontrada!");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const emprestimo = await tx.loan.create({
+        data: {
+          valor: valor,
+          numeroParcelas: numeroDeParcelas,
+          userId: usuario.id,
+        },
+      });
+
+      for (let i = 0; i < numeroDeParcelas; i++) {
+        await tx.installment.create({
+          data: {
+            valor: valor / numeroDeParcelas,
+            numero: i + 1,
+            situacao: "pendente",
+            loanId: emprestimo.id,
+          },
+        });
+      }
+
+      await tx.account.update({
+        where: {
+          id: usuario.account.id,
+        },
+        data: {
+          balance: {
+            increment: valor,
+          },
+        },
+      });
+    });
   }
-};
+}
+

@@ -1,6 +1,6 @@
-const Installment = require("./Installment");
+import Installment from "./Installment.js";
 
-module.exports = class Loan {
+export default class Loan {
   static #interestRate = 0.1;
 
   static get interestRate() {
